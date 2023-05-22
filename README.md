@@ -8,7 +8,7 @@ Script will run across all the RDS instances in customer account and provide the
 3. Identify the instances with no application connections 
 4. Savings in migrating from i01 to gp3 based on the allocated IOPS 
 
-The output will be an csv file which will have all the instance information along with the cost savings options.
+The script will create a costOptimizer.csv file as a output which will have all the instance information along with the cost savings options.
 
 ## How to run the script
 
