@@ -21,7 +21,7 @@ Install required libraries
 
 $ pip3 install -r requirements.txt  
 
-$ python3 ./costoptimizer.py -a -r us-east-2
+$ python3 ./costoptimizer.py -a -r us-east-2 -p 30
 Working on the instance ams57-instance-1
 Getting the details for db.t3.small aurora-mysql Single-AZ False
 Getting the Graviton details for db.t3.small ams57-instance-1
