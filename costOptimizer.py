@@ -32,7 +32,9 @@ engineMapping = {
    "postgres": "PostgreSQL",
    "sqlserver-se": "SQL Server",
    "sqlserver-ee": "SQL Server",
-   "sqlserver-ex": "SQL Server"
+   "sqlserver-ex": "SQL Server",
+   "db2-se": "Db2",
+   "db2-ee": "Db2"
 }
 
 instanceHierarcy = ["micro","small","medium","large","xlarge","2xlarge","4xlarge","8xlarge","12xlarge","16xlarge","24xlarge"]
@@ -235,8 +237,10 @@ def get_instance_cost(instanceType, engine, AZ, IOopt):
              ]
 
    data = pricingClient.get_products( ServiceCode='AmazonRDS', Filters=filters)
+   #print(data)
 
    price_list = data['PriceList']
+
    for line in price_list:
       instorig = json.loads(line)
       #print(json.dumps(instorig['product'],indent=2))
@@ -322,10 +326,6 @@ def get_cost_info(instanceType, instanceInfo, AZ, auroraIOopt):
 
    vcpu,memory,cost = get_instance_cost(instanceType, engine,AZ, auroraIOopt)
 
-   if memory is None or vcpu is None or cost is None:
-      print("Unable to get the details for")
-      print(memory, vcpu, cost)
-      print(instanceInfo)
 
    return memory,vcpu,cost
 
@@ -459,6 +459,10 @@ def cost_optimize(indInfo):
       auroraIOopt = True
 
    memory,vcpu,cost = get_cost_info(instanceType,indInfo, AZ, auroraIOopt)
+
+   if memory is None or vcpu is None or cost is None:
+      print("Unable to get the details for")
+      return
 
    engine = indInfo["Engine"]
    maxcpu = indInfo["MaxCPUUtilization"]
