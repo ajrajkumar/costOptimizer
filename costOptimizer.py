@@ -7,9 +7,6 @@ import sys
 import traceback
 import json
 from operator import itemgetter
-import dateutil
-import requests
-import os
 import csv
 
 global args
@@ -37,66 +34,18 @@ engineMapping = {
    "db2-ee": "Db2"
 }
 
+editionMapping = {
+   "sqlserver-se": "Standard",
+   "sqlserver-ex": "Web",
+   "sqlserver-ee": "Enterprise",
+   "oracle-se2": "Standard Two",
+   "oracle-ee": "Enterprise"
+}
+
 instanceHierarcy = ["micro","small","medium","large","xlarge","2xlarge","4xlarge","8xlarge","12xlarge","16xlarge","24xlarge"]
 tInstanceTypes = { "t4g": ["t2","t3"] }
 mInstanceTypes = { "m6g" : ["m5","m6"] }
 rInstanceTypes = { "r6g" : [ "r6"] }
-
-graviton = {
-"db.m5.2xlarge": "db.m6g.2xlarge",
-"db.m5.large": "db.m6g.large",
-"db.m5.xlarge": "db.m6g.xlarge",
-"db.r4.large": "db.r6g.large",
-"db.r5.16xlarge": "db.r6g.16xlarge",
-"db.r5.2xlarge": "db.r6g.2xlarge",
-"db.r5.4xlarge": "db.r6g.4xlarge",
-"db.r5.large": "db.r6g.large",
-"db.r5.xlarge": "db.r6g.xlarge",
-"db.r6g.2xlarge": "db.r6g.2xlarge",
-"db.r6g.large": "db.r6g.large",
-"db.r6g.xlarge": "db.r6g.xlarge",
-"db.serverless": "db.serverless",
-"db.t2.medium": "db.t4g.medium",
-"db.t2.micro": "db.t4g.micro",
-"db.t2.small": "db.t4g.small",
-"db.t3.large": "db.t4g.large",
-"db.t3.medium": "db.t4g.medium",
-"db.t3.micro": "db.t4g.micro",
-"db.t3.small": "db.t4g.small",
-"db.t3.xlarge": "db.t4g.xlarge",
-"db.t4g.large": "db.t4g.large",
-"db.t4g.medium": "db.t4g.medium",
-"db.t4g.micro": "db.t4g.micro"
-}
-
-downsizing = {
-"db.m5.2xlarge":["db.m5.xlarge","db.m5.large"],
-"db.m5.large":["db.m5.large","db.m5.large"],
-"db.m5.xlarge":["db.m5.large","db.m5.large"],
-"db.r4.large":["db.r4.large","db.r4.large"],
-"db.r5.16xlarge":["db.r5.8xlarge","db.r5.4xlarge"],
-"db.r5.2xlarge":["db.r5.xlarge","db.r5.large"],
-"db.r5.4xlarge":["db.r5.2xlarge","db.r5.xlarge"],
-"db.r5.large":["db.r5.large","db.r5.large"],
-"db.r5.xlarge":["db.r5.large","db.r5.large"],
-"db.r6g.2xlarge":["db.r6g.xlarge","db.r6g.large"],
-"db.r6g.large":["db.r6g.large","db.r6g.large"],
-"db.r6g.xlarge":["db.r6g.large","db.r6g.large"],
-"db.serverless":["db.serverless","db.serverless"],
-"db.t2.medium":["db.t2.small","db.t2.small"],
-"db.t2.micro":["db.t2.micro","db.t2.micro"],
-"db.t2.small":["db.t2.small","db.t2.small"],
-"db.t3.large":["db.t3.medium","db.t3.small"],
-"db.t3.medium":["db.t3.small","db.t3.small"],
-"db.t3.micro":["db.t3.micro","db.t3.micro"],
-"db.t3.small":["db.t3.small","db.t3.small"],
-"db.t3.xlarge":["db.t3.large","db.t3.medium"],
-"db.t4g.large":["db.t4g.medium","db.t4g.small"],
-"db.t4g.medium":["db.t4g.small","db.t4g.small"],
-"db.t4g.micro":["db.t4g.micro","db.t4g.micro"]
-}
-
-
 
 #------------------------------------------------------------------------------
 
@@ -237,8 +186,7 @@ def get_instance_cost(instanceType, engine, AZ, IOopt):
              ]
 
    data = pricingClient.get_products( ServiceCode='AmazonRDS', Filters=filters)
-   #print(data)
-
+   
    price_list = data['PriceList']
 
    for line in price_list:
@@ -316,8 +264,6 @@ def get_cost_info(instanceType, instanceInfo, AZ, auroraIOopt):
    vcpu = None
    cost = None
    engine = None
-   Gcost = None
-   Lcost = None
 
    if instanceInfo['Engine']== "aurora":
       engine = "aurora-mysql"
@@ -365,6 +311,7 @@ def mapGraviton(instanceType,indInfo, vcpu,memory, cost, AZ, auroraIOopt):
    if newInstanceType is None:
       return instanceType, vcpu, memory, cost
 
+   
    return newInstanceType, newVcpu, newMemory, newCost
 
 #------------------------------------------------------------------------------
@@ -378,7 +325,7 @@ def downsizeInstance(instanceType,indInfo, vcpu, memory, cost, AZ, auroraIOopt, 
       # Current Generation instances supports only min of 2 vcpus
       newVcpu = 2
    newMemory = int(int(memory)/int(factor))
-   print (newVcpu, newMemory)
+   #print (newVcpu, newMemory)
    newCost = None
    newInstanceType = None
 
@@ -391,28 +338,32 @@ def downsizeInstance(instanceType,indInfo, vcpu, memory, cost, AZ, auroraIOopt, 
                { 'Type': 'TERM_MATCH', 'Field': 'currentGeneration', 'Value': "yes"}
              ]
 
+   if indInfo['Engine'] in editionMapping:
+      filters.append({ 'Type': 'TERM_MATCH', 'Field': 'databaseEdition', 'Value': editionMapping[indInfo['Engine']]})
+   
    data = pricingClient.get_products( ServiceCode='AmazonRDS', Filters=filters)
 
    price_list = data['PriceList']
    for line in price_list:
       instorig = json.loads(line)
+      #print(instorig['product']['attributes']['instanceType'])
       if not auroraIOopt:
          if instorig['product']['attributes']['storage'] == "Aurora IO Optimization Mode":
             continue
-      newMemory, newVcpu, newCost, newInstanceType = cpu_memory_cost_details(instorig)
+      if instanceType.split(".")[0]+"."+instanceType.split(".")[1] == instorig['product']['attributes']['instanceType'].split(".")[0]+"."+instorig['product']['attributes']['instanceType'].split(".")[1]:
+         newMemory, newVcpu, newCost, newInstanceType = cpu_memory_cost_details(instorig)
       #print(json.dumps(instorig['product'],indent=2))
 
    if newInstanceType is None:
       return instanceType, vcpu, memory, cost
-
+   
+   #print("Printing the value", newInstanceType, newVcpu, newMemory, newCost)
    return newInstanceType, newVcpu, newMemory, newCost
 
 #------------------------------------------------------------------------------
 
 def cpu_memory_cost_details(instorig):
-
    newMemory,newVcpu,newCost,newInstanceType = None,None,None,None
-   #print(json.dumps(instorig,indent=2))
    inst = instorig
    inst = inst['terms']['OnDemand']
    inst = list(inst.values())[0]
@@ -461,8 +412,8 @@ def cost_optimize(indInfo):
    memory,vcpu,cost = get_cost_info(instanceType,indInfo, AZ, auroraIOopt)
 
    if memory is None or vcpu is None or cost is None:
-      print("Unable to get the details for")
-      return
+      print("Unable to get the details for {}".format(indInfo['DBInstanceIdentifier']))
+      return None
 
    engine = indInfo["Engine"]
    maxcpu = indInfo["MaxCPUUtilization"]
@@ -484,8 +435,6 @@ def cost_optimize(indInfo):
    if maxcpu != NoData :
       if float(maxcpu) <= 20.0 :
          LinstanceType, Lvcpu, Lmemory, Lcost  = downsizeInstance(instanceType,indInfo, vcpu, memory, cost, AZ, auroraIOopt, 4)
-         if LinstanceType == instanceType:
-             LinstanceType, Lvcpu, Lmemory, Lcost  = downsizeInstance(instanceType,indInfo, vcpu, memory, cost, AZ, auroraIOopt, 2)
       elif float(maxcpu) <= 40.0 :
          LinstanceType, Lvcpu, Lmemory, Lcost  = downsizeInstance(instanceType,indInfo, vcpu, memory, cost, AZ, auroraIOopt, 2)
 
@@ -531,7 +480,6 @@ def main():
    global pricingClient
 
    allInfo = []
-   output = {}
    get_param()
 
    pricingClient = boto3.client('pricing', region_name="us-east-1")
@@ -542,7 +490,7 @@ def main():
          response = rds.describe_db_instances(DBInstanceIdentifier=args.name)
       else:
          response = rds.describe_db_instances()
-      i=0
+
       for instanceNames in response['DBInstances']:
          instanceName = instanceNames['DBInstanceIdentifier']
          print("Working on the instance {}".format(instanceName))
@@ -552,12 +500,10 @@ def main():
          metric_data= get_metrics(instanceName)
          indInfo = merge_instance_info (instance_info,metric_data)
          indInfo = cost_optimize(indInfo)
-         allInfo.append(indInfo)
-         #i = i+1
-         #if i > 5 :
-         #   break
-         #break
-
+         if indInfo is None:
+            print("Skipping the details for {}".format(instanceNames['DBInstanceIdentifier']))
+         else:
+            allInfo.append(indInfo)
       write_to_csv()
 
    except:
